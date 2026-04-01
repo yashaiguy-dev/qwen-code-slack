@@ -164,6 +164,7 @@ def call_qwen_streaming(
         "-p", prompt,
         "--output-format", "stream-json",
         "--verbose",
+        "--yolo",  # Auto-approve all actions (file edits, shell commands, etc.)
     ]
     if session_id:
         cmd.extend(["--resume", session_id])
