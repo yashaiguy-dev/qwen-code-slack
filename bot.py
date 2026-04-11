@@ -157,6 +157,7 @@ def call_qwen_streaming(
     """Invoke `qwen -p` with streaming JSON output.
 
     Each assistant text block calls on_text() as it arrives.
+    Final `result` text is only passed to on_text if no assistant text was streamed (avoids duplicates).
     Returns the session_id from the result message (for thread continuity).
     """
     cmd = [
@@ -182,6 +183,8 @@ def call_qwen_streaming(
 
     new_session_id = session_id
     deadline = time.time() + QWEN_TIMEOUT
+    # stream-json usually echoes the full answer again on `result`; avoid double-posting to Slack.
+    saw_assistant_text = False
 
     try:
         for line in proc.stdout:
@@ -205,13 +208,13 @@ def call_qwen_streaming(
                     if isinstance(block, dict) and block.get("type") == "text":
                         text = block.get("text", "").strip()
                         if text:
+                            saw_assistant_text = True
                             on_text(text)
 
             elif msg_type == "result":
                 new_session_id = data.get("session_id") or new_session_id
-                # Also check for text in result
                 result_text = data.get("result", "").strip()
-                if result_text:
+                if result_text and not saw_assistant_text:
                     on_text(result_text)
 
         proc.wait(timeout=30)
